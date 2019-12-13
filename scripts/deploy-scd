@@ -2,7 +2,7 @@
 
 function sed_inplace {
   # sed's -i argument behaves differently on macOS, hence this hack
-  sed -i.bak "$1" $2 && rm $2.bak
+  sed -i.bak "$1" "$2" && rm "$2".bak
 }
 
 function write_json_scd {
@@ -12,7 +12,7 @@ function write_json_scd {
   fi
 
   echo "Publishing output into $1"
-  cat > $1 <<- EOM
+  cat > "$1" <<- EOM
 {
   "ETH_FROM": "$ETH_FROM",
   "GEM": "$SAI_GEM",
@@ -46,12 +46,12 @@ EOM
 
 function deploy_scd {
   # Fix sai deploy script
-  sed_inplace '13s/DSToken.*/WETH9)/' $LIB/sai/bin/deploy
+  sed_inplace '13s/DSToken.*/WETH9)/' "$LIB"/sai/bin/deploy
   # Change sai deploy scripts (deploy and deploy-fab) to skip dapp build if SKIP_BUILD_IF_ALREADY_BUILT is set and dapp is already built
-  sed_inplace 's/^dapp build$/if [[ -z "$SKIP_BUILD_IF_ALREADY_BUILT" || ( -n "$SKIP_BUILD_IF_ALREADY_BUILT" \&\& ! -f out\/SaiTop.abi ) ]]; then dapp build; fi/' $LIB/sai/bin/deploy-fab
-  sed_inplace 's/^dapp build$/# dapp build/' $LIB/sai/bin/deploy
+  sed_inplace 's/^dapp build$/if [[ -z "$SKIP_BUILD_IF_ALREADY_BUILT" || ( -n "$SKIP_BUILD_IF_ALREADY_BUILT" \&\& ! -f out\/SaiTop.abi ) ]]; then dapp build; fi/' "$LIB"/sai/bin/deploy-fab
+  sed_inplace 's/^dapp build$/# dapp build/' "$LIB"/sai/bin/deploy
 
-  cd $LIB/sai
+  cd "$LIB"/sai
   if [[ -z "$SKIP_BUILD_IF_ALREADY_BUILT" || ( -n "$SKIP_BUILD_IF_ALREADY_BUILT" && ! -f out/SaiTop.abi ) ]]; then
     echo "Building and deploying sai contracts..."
   else
@@ -61,19 +61,19 @@ function deploy_scd {
   bin/deploy     && . load-env-unknown
 
   # Set the ETH price feed to 400 USD
-  seth send $SAI_PIP "poke(bytes32)" 0x000000000000000000000000000000000000000000000015af1d78b58c400000
+  seth send "$SAI_PIP" "poke(bytes32)" 0x000000000000000000000000000000000000000000000015af1d78b58c400000
   # Set the MKR price feed to 1040.49 USD
-  seth send $SAI_PEP "poke(bytes32)" 0x00000000000000000000000000000000000000000000003867bb3260a7cf7200
-  seth send $SAI_MOM "setCap(uint256)" $(seth --to-uint256 $(seth --to-wei 1000 eth))
+  seth send "$SAI_PEP" "poke(bytes32)" 0x00000000000000000000000000000000000000000000003867bb3260a7cf7200
+  seth send "$SAI_MOM" "setCap(uint256)" "$(seth --to-uint256 "$(seth --to-wei 1000 eth)")"
   # Mint MKR, owned by default account
-  seth send $SAI_GOV "mint(uint256)" 0x000000000000000000000000000000000000000000000015af1d78b58c400000
+  seth send "$SAI_GOV" "mint(uint256)" 0x000000000000000000000000000000000000000000000015af1d78b58c400000
   cd -
 
   ############################
   # build oasis
 
-  export SOLC_FLAGS=${SOLC_FLAGS:-"--optimize"}
-  cd $LIB/maker-otc
+  export SOLC_FLAGS="${SOLC_FLAGS:-"--optimize"}"
+  cd "$LIB"/maker-otc
   if [ -n "$SKIP_BUILD_IF_ALREADY_BUILT" ] && [ -f out/MatchingMarket.abi ]; then
     echo "Skipping dapp build for maker-otc (already built)"
   else
@@ -89,7 +89,7 @@ function deploy_scd {
   ############################
   # build proxy registry
 
-  cd $LIB/proxy-registry
+  cd "$LIB"/proxy-registry
   if [ -n "$SKIP_BUILD_IF_ALREADY_BUILT" ] && [ -f out/ProxyRegistry.abi ]; then
     echo "Skipping dapp build for proxy-registry (already built)"
   else
@@ -100,19 +100,19 @@ function deploy_scd {
   DS_PROXY_FACTORY=$(dapp create DSProxyFactory)
   echo "Deployed DSProxyFactory to $DS_PROXY_FACTORY"
 
-  PROXY_REGISTRY=$(dapp create ProxyRegistry $DS_PROXY_FACTORY)
+  PROXY_REGISTRY=$(dapp create ProxyRegistry "$DS_PROXY_FACTORY")
   echo "Deployed ProxyRegistry to $PROXY_REGISTRY"
 
   echo "Creating DSProxy via ProxyRegistry.build()..."
-  DS_PROXY="0x"$(seth --abi-decode "build()(address)" $(seth call $PROXY_REGISTRY "build()")) # Get expected address of new DSProxy instance about to be created
-  seth send $PROXY_REGISTRY "build()"
+  DS_PROXY="0x"$(seth --abi-decode "build()(address)" "$(seth call "$PROXY_REGISTRY" "build()")") # Get expected address of new DSProxy instance about to be created
+  seth send "$PROXY_REGISTRY" "build()"
   echo "Created new DSProxy instance with address: $DS_PROXY"
   cd -
 
   ############################
   # build sai proxy
 
-  cd $LIB/sai-proxy
+  cd "$LIB"/sai-proxy
   if [ -n "$SKIP_BUILD_IF_ALREADY_BUILT" ] && [ -f out/SaiProxyCreateAndExecute.abi ]; then
     echo "Skipping dapp build for sai-proxy (already built)"
   else
@@ -127,7 +127,7 @@ function deploy_scd {
   ############################
   # build oasis proxy
 
-  cd $LIB/oasis-direct-proxy
+  cd "$LIB"/oasis-direct-proxy
   if [ -n "$SKIP_BUILD_IF_ALREADY_BUILT" ] && [ -f out/ProxyCreationAndExecute.abi ]; then
     echo "Skipping dapp build for oasis-direct-proxy (already built)"
   else
@@ -135,7 +135,7 @@ function deploy_scd {
     dapp --use solc:0.4.25 build
   fi
   echo "Deploying oasis-direct-proxy (ProxyCreationAndExecute)..."
-  OASIS_PROXY=$(dapp create ProxyCreationAndExecute $SAI_GEM)
+  OASIS_PROXY=$(dapp create ProxyCreationAndExecute "$SAI_GEM")
   echo "Deployed ProxyCreationAndExecute to $OASIS_PROXY"
   cd -
 
@@ -143,17 +143,17 @@ function deploy_scd {
   # build maker redeemer
 
   # deploy a DSToken stand-in for old MKR
-  cd $LIB/ds-token
+  cd "$LIB"/ds-token
   dapp update
   echo "Building old MKR token..."
   dapp build
   echo "Deploying old MKR token..."
-  OLD_MKR=$(dapp create DSToken $(seth --to-bytes32 $(seth --from-ascii 'OLD_MKR')))
+  OLD_MKR=$(dapp create DSToken "$(seth --to-bytes32 "$(seth --from-ascii 'OLD_MKR')")")
   echo "Deployed old MKR to $OLD_MKR"
-  seth send $OLD_MKR "mint(address,uint256)" $ETH_FROM 0x000000000000000000000000000000000000000000000015af1d78b58c400000
+  seth send "$OLD_MKR" "mint(address,uint256)" "$ETH_FROM" 0x000000000000000000000000000000000000000000000015af1d78b58c400000
   cd -
 
-  cd $LIB/maker-499
+  cd "$LIB"/maker-499
   if [ -n "$SKIP_BUILD_IF_ALREADY_BUILT" ] && [ -f out/Redeemer.abi ]; then
     echo "Skipping dapp build for MKR redeemer (already built)"
   else
@@ -161,29 +161,29 @@ function deploy_scd {
     dapp --use solc:0.4.16 build
   fi
   echo "Deploying MKR redeemer..."
-  REDEEMER=$(dapp create Redeemer $OLD_MKR $SAI_GOV $(seth --to-hex 2000000000))
+  REDEEMER=$(dapp create Redeemer "$OLD_MKR" "$SAI_GOV" "$(seth --to-hex 2000000000)")
   echo "Deployed MKR redeemer to $REDEEMER"
   cd -
 
   ############################
   # build old chief
 
-  cd $LIB/ds-chief
+  cd "$LIB"/ds-chief
   dapp update
   dapp --use solc:0.5.0 build --extract
   export SETH_ASYNC=yes
-  test -z $OLD_IOU && IOUtx=$(dapp create DSToken $(seth --to-bytes32 $(seth --from-ascii 'IOU')))
+  test -z "$OLD_IOU" && IOUtx=$(dapp create DSToken "$(seth --to-bytes32 "$(seth --from-ascii 'IOU')")")
   export SETH_ASYNC=no
-  test -z $OLD_IOU && OLD_IOU=$(seth receipt $IOUtx contractAddress)
+  test -z "$OLD_IOU" && OLD_IOU=$(seth receipt "$IOUtx" contractAddress)
   MAX_YAYS=5
-  OLD_CHIEF=$(dapp create DSChief $SAI_GOV $OLD_IOU $MAX_YAYS)
-  seth send $OLD_IOU 'setOwner(address)' $OLD_CHIEF
+  OLD_CHIEF=$(dapp create DSChief "$SAI_GOV" "$OLD_IOU" "$MAX_YAYS")
+  seth send "$OLD_IOU" 'setOwner(address)' "$OLD_CHIEF"
   echo "Deployed old DSChief to $OLD_CHIEF and old IOU to $OLD_IOU"
 
   ############################
   # build polling emitter
 
-  cd  $LIB/symbolic-voting
+  cd  "$LIB"/symbolic-voting
   dapp update
   dapp --use solc:0.5.0 build --extract
   POLLING=$(dapp create PollingEmitter)
@@ -191,21 +191,21 @@ function deploy_scd {
 
   ############################
 
-  mkdir -p $OUT
+  mkdir -p "$OUT"
   write_json_scd "$OUT/addresses.json"
 
-  cp $LIB/maker-otc/out/MatchingMarket.abi \
-  $LIB/sai-proxy/out/SaiProxyCreateAndExecute.abi \
-  $LIB/proxy-registry/out/ProxyRegistry.abi \
-  $LIB/proxy-registry/out/DSProxy.abi \
-  $LIB/proxy-registry/out/DSProxyFactory.abi \
-  $LIB/oasis-direct-proxy/out/ProxyCreationAndExecute.abi \
-  $LIB/maker-499/out/Redeemer.abi \
-  $LIB/ds-chief/out/DSChief.abi \
-  $LIB/symbolic-voting/out/PollingEmitter.abi \
-  $OUT
+  cp "$LIB"/maker-otc/out/MatchingMarket.abi \
+  "$LIB"/sai-proxy/out/SaiProxyCreateAndExecute.abi \
+  "$LIB"/proxy-registry/out/ProxyRegistry.abi \
+  "$LIB"/proxy-registry/out/DSProxy.abi \
+  "$LIB"/proxy-registry/out/DSProxyFactory.abi \
+  "$LIB"/oasis-direct-proxy/out/ProxyCreationAndExecute.abi \
+  "$LIB"/maker-499/out/Redeemer.abi \
+  "$LIB"/ds-chief/out/DSChief.abi \
+  "$LIB"/symbolic-voting/out/PollingEmitter.abi \
+  "$OUT"
 
-  ls $LIB/sai/out/*.abi | \
+  ls "$LIB"/sai/out/*.abi | \
   grep -v -E "(Fab|Dev|Test|t_sol)" | \
   xargs sh -c "cp \$@ $OUT" placeholder
 
