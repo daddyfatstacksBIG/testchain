@@ -1,39 +1,41 @@
 #!/usr/bin/env bash
 
-function jq_inplace {
+function jq_inplace() {
   TMP=$(mktemp)
-  jq "$1" > $TMP && mv $TMP "$2"
+  jq "$1" >"$TMP" && mv "$TMP" "$2"
 }
 
-function sed_inplace {
+function sed_inplace() {
   # sed's -i argument behaves differently on macOS, hence this hack
-  sed -i.bak "$1" $2 && rm $2.bak
+  sed -i.bak "$1" "$2" && rm "$2".bak
 }
 
-function deploy_mcd_dds {
+function deploy_mcd_dds() {
   DDS=$LIB/dss-deploy-scripts
-  cd $DDS
+  cd "$DDS"
 
-  export MCD_PAUSE_DELAY=0
+  export MCD_PAUSE_DELAY=1
 
   TMP=$(mktemp)
-
-  # change deploy-testchain not to send 10000 ETH
-  sed_inplace 's/10000 eth/1 eth/' deploy-testchain.sh
 
   # deploy migration contracts with local tub and gem
-  TUB=$(sudo cat $OUT/addresses.json | jq '.TUB')
-  GEM=$(sudo cat $OUT/addresses.json | jq '.GEM')
-  GOV=$(sudo cat $OUT/addresses.json | jq '.GOV')
-  DEPLOY=$DDS/deploy-testchain.json
-  sudo cat $DEPLOY | jq_inplace ".migration = $(<$LIB/deploy-migration.json)" $DEPLOY
-  sudo cat $DEPLOY | jq_inplace ".migration.tub = $(echo $TUB)" $DEPLOY
-  sudo cat $DEPLOY | jq_inplace ".tokens.ETH.gem = $(echo $GEM)" $DEPLOY
-  sudo cat $DEPLOY | jq_inplace ".gov = $(echo $GOV)" $DEPLOY
+  TUB=$(cat "$OUT"/addresses.json | jq '.TUB')
+  GEM=$(cat "$OUT"/addresses.json | jq '.GEM')
+  GOV=$(cat "$OUT"/addresses.json | jq '.GOV')
+  OMNIA_AMOUNT="1"
+  DEPLOY=$DDS/config/testchain.json
+  cat "$DEPLOY" | jq_inplace ".omniaAmount = $(echo "$OMNIA_AMOUNT")" "$DEPLOY"
+  cat "$DEPLOY" | jq_inplace ".migration = $(<"$LIB"/deploy-migration.json)" "$DEPLOY"
+  cat "$DEPLOY" | jq_inplace ".migration.tub = $(echo "$TUB")" "$DEPLOY"
+  cat "$DEPLOY" | jq_inplace ".tokens.ETH.import.gem = $(echo "$GEM")" "$DEPLOY"
+  cat "$DEPLOY" | jq_inplace ".import.gov = $(echo "$GOV")" "$DEPLOY"
+
+  # change ds-pause delay to non-zero
+  cat "$DEPLOY" | jq_inplace ".pauseDelay = $(echo "$MCD_PAUSE_DELAY")" "$DEPLOY"
 
   # submodule contracts are deprecated; this nix command
   # installs all necessary dependencies
-  IN_NIX_SHELL=yes nix run -f $DDS -c deploy-testchain.sh
+  ETH_RPC_URL="http://localhost:2000" nix run -f ./ -c dss-deploy testchain
 
   # uncomment below to add more ilks
   # DPA=$LIB/testchain-dss-deployment-scripts/contracts/dss-proxy-actions
@@ -43,14 +45,16 @@ function deploy_mcd_dds {
   # . bin/deploy-ilk-eth B
 
   ls \
-    $DDS/out/abi/* \
-    $DDS/contracts/dss-deploy/out/*.abi | \
-    grep -v -E "(Fab|Dev|Test|Like|t_sol|lib_|src_)" | \
+    "$DDS"/out/abi/* \
+    \
+    grep -v -E "(Fab|Dev|Test|Like|t_sol|lib_|src_)" | # $DDS/contracts/dss-deploy/out/*.abi | \
     xargs sh -c "sudo cp \$@ $OUT/mcd" placeholder
   # why the placeholder? see https://en.wikipedia.org/wiki/Xargs#Shell_trick
 
+  # TODO: this line no longer runs, but can be run manually
+  # jq -S . lib/dss-deploy-scripts/out/addresses.json > out/addresses-mcd.json
   # sort addresses alphabetically
-  jq -S . $DDS/out/addresses.json > $OUT/addresses-mcd.json
+  jq -S . "$DDS"/out/addresses.json >"$OUT"/addresses-mcd.json
 
   # all done, go home!
   cd -
