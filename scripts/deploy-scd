@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 
-function sed_inplace {
+function sed_inplace() {
   # sed's -i argument behaves differently on macOS, hence this hack
   sed -i.bak "$1" "$2" && rm "$2".bak
 }
 
-function write_json_scd {
+function write_json_scd() {
   if [ -z "$1" ]; then
     echo "No output file passed. Use write_json path/to/file.json"
     exit 1
   fi
 
   echo "Publishing output into $1"
-  cat > "$1" <<- EOM
+  cat >"$1" <<-EOM
 {
   "ETH_FROM": "$ETH_FROM",
   "GEM": "$SAI_GEM",
@@ -47,7 +47,7 @@ function write_json_scd {
 EOM
 }
 
-function deploy_scd {
+function deploy_scd() {
   # Fix sai deploy script
   sed_inplace '13s/DSToken.*/WETH9)/' "$LIB"/sai/bin/deploy
   # Change sai deploy scripts (deploy and deploy-fab) to skip dapp build if SKIP_BUILD_IF_ALREADY_BUILT is set and dapp is already built
@@ -58,16 +58,16 @@ function deploy_scd {
   # build sai
 
   cd "$LIB"/sai
-  if [[ -z "$SKIP_BUILD_IF_ALREADY_BUILT" || ( -n "$SKIP_BUILD_IF_ALREADY_BUILT" && ! -f out/SaiTop.abi ) ]]; then
+  if [[ -z "$SKIP_BUILD_IF_ALREADY_BUILT" || (-n "$SKIP_BUILD_IF_ALREADY_BUILT" && ! -f out/SaiTop.abi) ]]; then
     echo "Building and deploying sai contracts..."
   else
     echo "Deploying sai contracts..."
   fi
   bin/deploy-fab && . load-fab-unknown
-  bin/deploy     && . load-env-unknown
+  bin/deploy && . load-env-unknown
 
   # TODO: delete 0x prefix from saved addresses in deploy
-  
+
   # Set the ETH price feed to 400 USD
   seth send "$SAI_PIP" "poke(bytes32)" 0x000000000000000000000000000000000000000000000015af1d78b58c400000
   # Set the MKR price feed to 1040.49 USD
@@ -123,7 +123,7 @@ function deploy_scd {
     echo "Skipping dapp build for sai-proxy (already built)"
   else
     echo "Building sai-proxy..."
-    dapp --use solc:0.4.25 build  --extract
+    dapp --use solc:0.4.25 build --extract
   fi
   echo "Deploying sai-proxy (SaiProxyCreateAndExecute)..."
   SAI_PROXY=$(dapp create SaiProxyCreateAndExecute)
@@ -190,7 +190,7 @@ function deploy_scd {
   ############################
   # build polling emitter
 
-  cd  "$LIB"/symbolic-voting
+  cd "$LIB"/symbolic-voting
   dapp update
   dapp --use solc:0.5.0 build --extract
   POLLING=$(dapp create PollingEmitter)
@@ -240,22 +240,22 @@ function deploy_scd {
   write_json_scd "$OUT/addresses.json"
 
   cp "$LIB"/maker-otc/out/MatchingMarket.abi \
-  "$LIB"/sai-proxy/out/SaiProxyCreateAndExecute.abi \
-  "$LIB"/proxy-registry/out/ProxyRegistry.abi \
-  "$LIB"/proxy-registry/out/DSProxy.abi \
-  "$LIB"/proxy-registry/out/DSProxyFactory.abi \
-  "$LIB"/oasis-direct-proxy/out/ProxyCreationAndExecute.abi \
-  "$LIB"/maker-499/out/Redeemer.abi \
-  "$LIB"/ds-chief/out/DSChief.abi \
-  "$LIB"/symbolic-voting/out/PollingEmitter.abi \
-  "$LIB"/vote-proxy/out/VoteProxyFactory.abi \
-  "$LIB"/line-spell/out/LineSpell.abi \
-  "$LIB"/sai-cagefree/out/CageFree.abi \
-  "$OUT"
+    "$LIB"/sai-proxy/out/SaiProxyCreateAndExecute.abi \
+    "$LIB"/proxy-registry/out/ProxyRegistry.abi \
+    "$LIB"/proxy-registry/out/DSProxy.abi \
+    "$LIB"/proxy-registry/out/DSProxyFactory.abi \
+    "$LIB"/oasis-direct-proxy/out/ProxyCreationAndExecute.abi \
+    "$LIB"/maker-499/out/Redeemer.abi \
+    "$LIB"/ds-chief/out/DSChief.abi \
+    "$LIB"/symbolic-voting/out/PollingEmitter.abi \
+    "$LIB"/vote-proxy/out/VoteProxyFactory.abi \
+    "$LIB"/line-spell/out/LineSpell.abi \
+    "$LIB"/sai-cagefree/out/CageFree.abi \
+    "$OUT"
 
-  ls "$LIB"/sai/out/*.abi | \
-  grep -v -E "(Fab|Dev|Test|t_sol)" | \
-  xargs sh -c "cp \$@ $OUT" placeholder
+  ls "$LIB"/sai/out/*.abi |
+    grep -v -E "(Fab|Dev|Test|t_sol)" |
+    xargs sh -c "cp \$@ $OUT" placeholder
 
   # for an explanation of the placeholder arg above, see:
   # https://en.wikipedia.org/wiki/Xargs#Shell_trick

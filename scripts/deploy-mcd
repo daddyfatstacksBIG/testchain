@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 
-function jq_inplace {
+function jq_inplace() {
   TMP=$(mktemp)
-  jq "$1" > "$TMP" && mv "$TMP" "$2"
+  jq "$1" >"$TMP" && mv "$TMP" "$2"
 }
 
-function sed_inplace {
+function sed_inplace() {
   # sed's -i argument behaves differently on macOS, hence this hack
   sed -i.bak "$1" "$2" && rm "$2".bak
 }
 
-function deploy_mcd_dds {
+function deploy_mcd_dds() {
   DDS=$LIB/dss-deploy-scripts
   cd "$DDS"
 
@@ -46,15 +46,15 @@ function deploy_mcd_dds {
 
   ls \
     "$DDS"/out/abi/* \
-    # $DDS/contracts/dss-deploy/out/*.abi | \
-    grep -v -E "(Fab|Dev|Test|Like|t_sol|lib_|src_)" | \
+    \
+    grep -v -E "(Fab|Dev|Test|Like|t_sol|lib_|src_)" | # $DDS/contracts/dss-deploy/out/*.abi | \
     xargs sh -c "sudo cp \$@ $OUT/mcd" placeholder
   # why the placeholder? see https://en.wikipedia.org/wiki/Xargs#Shell_trick
 
   # TODO: this line no longer runs, but can be run manually
   # jq -S . lib/dss-deploy-scripts/out/addresses.json > out/addresses-mcd.json
   # sort addresses alphabetically
-  jq -S . "$DDS"/out/addresses.json > "$OUT"/addresses-mcd.json
+  jq -S . "$DDS"/out/addresses.json >"$OUT"/addresses-mcd.json
 
   # all done, go home!
   cd -
